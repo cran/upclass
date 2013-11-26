@@ -1,8 +1,7 @@
 .packageName <- 'upclass'
 
 noupclassify <-
-  function (Xtrain, cltrain, Xtest, cltest = NULL, modelscope = NULL, 
-            reportrate = TRUE, ...) 
+  function (Xtrain, cltrain, Xtest, cltest = NULL, modelscope = NULL, ...) 
   {
     if (is.null(modelscope)) {
       if (is.matrix(Xtrain)) {
@@ -19,7 +18,7 @@ noupclassify <-
     for (modelName in modelscope) {
       res[[modelName]] <- list()
       res[[modelName]] <- noupclassifymodel(Xtrain, cltrain, Xtest, 
-                                            cltest, modelName, reportrate = reportrate, ...)
+                                            cltest, modelName, ...)
       if(!is.na(res[[modelName]]$bic)){
         if (res[[modelName]]$bic > bestBIC) {
           res[["Best"]] <- res[[modelName]]
@@ -27,5 +26,6 @@ noupclassify <-
         }
       }
     }
+    class(res)<-"upclassfit" 
     res
   }

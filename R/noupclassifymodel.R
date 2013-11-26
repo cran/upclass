@@ -1,7 +1,6 @@
 .packageName <- 'upclass'
 
-noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", 
-                               reportrate = TRUE, ...) 
+noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", ...) 
 {
   functioncall <- match.call(expand.dots = TRUE)
   if (is.matrix(Xtrain)) {
@@ -35,7 +34,6 @@ noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName 
     d <- 1
   }
   G <- dim(ltrain)[2]
-  #  cat(modelName,"\n")
   fitm <- mstep(modelName = modelName, data = Xtrain, z = ltrain)
   fite <- do.call("estep", c(list(data = Xtest), fitm))
   z <- fite$z
@@ -54,8 +52,7 @@ noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName 
   res$G <- G
   res$modelName <- modelName
   res$parameters <- fitm$parameters
-  res$reportrate<-reportrate # NR for print to work
-  if (reportrate) {
+  
     fitetrain <- do.call("estep", c(list(data = Xtrain), 
                                     fitm))
     ztrain <- fitetrain$z
@@ -65,11 +62,12 @@ noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName 
     rownames(tab) <- colnames(tab) <- 1:G
     tab[rownames(tab0), colnames(tab0)] <- tab0
     rate <- sum(tab) - sum(diag(tab))
-    Brier <- sum((ltrain - ztrain)^2)/2
+    Brier <- sum((ltrain - ztrain)^2)*100/(2*Ntrain)
     res$train <- list()
     res$train$z <- ztrain
     res$train$cl <- cltrain
-    res$train$rate <- rate
+    res$train$misclass <- rate
+    res$train$rate <-rate*100/length(cltrain)
     res$train$Brierscore <- Brier
     res$train$tab <- tab
     cl <- map(z)
@@ -83,15 +81,14 @@ noupclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName 
       rownames(tab) <- colnames(tab) <- 1:G
       tab[rownames(tab0), colnames(tab0)] <- tab0
       rate <- sum(tab) - sum(diag(tab))
-      Brier <- sum((ltest - z)^2)/2
-      res$test$rate <- rate
+      Brier <- sum((ltest - z)^2)*100/(2*Ntest)
+      res$test$misclass <- rate
+      res$test$rate <-rate*100/length(cltest)
       res$test$Brierscore <- Brier
       res$test$tab <- tab
     }
-  }
   bic.all <- bic(modelName, ll, fitm$n, fitm$d, fitm$G)
   res$ll <- ll
   res$bic <- bic.all
-  class(res)<-"upclassfit"
   res
 }

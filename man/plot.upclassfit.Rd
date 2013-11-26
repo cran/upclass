@@ -5,7 +5,7 @@
 Plot for upclassfit
 }
 \description{
-These are methods for objects of class \code{upclassfit}, produced by functions in the \pkg{upclass} such as \code{\link{upclassify}}, \code{\link{upclassifymodel}}, \code{\link{noupclassify}}, and \code{\link{noupclassifymodel}}.
+\code{plot} method for class \code{"upclassfit"}. 
 }
 \usage{
 \method{plot}{upclassfit}(x, \dots)
@@ -20,7 +20,7 @@ further \link{graphical parameters}.
 }
 }
 \details{
-Produces as a heatmap, a representation of the Goodness of Fit of the selected model, or the best model if generated from \code{upclassify} or \code{noupclassify}
+It produces the a posteriori probabilities of each observation belonging to each group, for the best model selected by either \code{upclassify} or \code{noupclassify}. Suspect classifications may be easier to identify as they will appear more to the centre between the upper and lower margins of the plot.
 }
 
 \author{
@@ -38,11 +38,11 @@ Niamh Russell
 \examples{
 data(wine, package = "gclus")
 X <- as.matrix(wine[, -1])
-cl <- as.matrix(wine[, 1])
+cl <- unclass(wine[, 1])
 indtrain <- sort(sample(1:178, 120))
 indtest <- setdiff(1:178, indtrain)
 
-fitup <- upclassifymodel(Xtrain = X[indtrain,], cltrain = cl[indtrain], Xtest = X[indtest, ], cltest = cl[indtest])
+fitup <- upclassify(X[indtrain,], cl[indtrain], X[indtest,], cl[indtest])
 plot(fitup)
 }
 

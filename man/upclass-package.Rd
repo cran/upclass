@@ -12,8 +12,8 @@ This package contains a collection of functions which implement data classificat
 \tabular{ll}{
 Package: \tab upclass\cr
 Type: \tab Package\cr
-Version: \tab 1.0\cr
-Date: \tab 2012-09-20\cr
+Version: \tab 2.0\cr
+Date: \tab 2013-11-26\cr
 License: \tab GPL-2\cr
 LazyLoad: yes\cr
 }
@@ -47,6 +47,6 @@ cltest <- cl[indtest]
 
 fitupmodels <- upclassify(Xtrain, cltrain,
      Xtest, cltest)       #testing every model.
-plot(fitupmodels$Best)
+plot(fitupmodels)
 }
 

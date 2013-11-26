@@ -2,7 +2,7 @@
 
 upclassify <-
   function (Xtrain, cltrain, Xtest, cltest = NULL, modelscope = NULL, 
-            tol = 10^-5, iterlim = 1000, Aitken = TRUE, reportrate = TRUE, 
+            tol = 10^-5, iterlim = 1000, Aitken = TRUE, 
             ...) 
   {
     if (is.null(modelscope)) {
@@ -21,7 +21,7 @@ upclassify <-
       res[[modelName]] <- list()
       res[[modelName]] <- upclassifymodel(Xtrain, cltrain, Xtest, 
                                           cltest, modelName, tol = tol, iterlim = iterlim, 
-                                          Aitken = Aitken, reportrate = reportrate, ...)
+                                          Aitken = Aitken, ...)
       if(!is.na(res[[modelName]]$bic)){
         if (res[[modelName]]$bic > bestBIC) {
           res[["Best"]] <- res[[modelName]]
@@ -29,5 +29,7 @@ upclassify <-
         }
       }
     }
+    class(res)<-"upclassfit" 
     res
+
   }

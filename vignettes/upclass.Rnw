@@ -1,0 +1,853 @@
+\documentclass[article,nojss]{jss}
+
+\usepackage{hyperref}
+\usepackage{amssymb, amsmath}
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{amsbsy}
+
+\newcommand\T{\rule{0pt}{2.6ex}} % table spacing
+\newcommand\B{\rule[-1.2ex]{0pt}{0pt}} % table spacing
+\newcommand{\HRule}{\rule{\linewidth}{0.4mm}} % horizontal line
+\newcommand{\Xtrain}{\mathrm{\textbf{x}}_N}
+\newcommand{\cltrain}{\mathrm{\textbf{l}}_N}
+\newcommand{\Xtest}{\mathrm{\textbf{y}}_M}
+\newcommand{\cltest}{\mathrm{\textbf{z}}_M}
+%\usepackage{Sweave}
+%%\VignetteIndexEntry{Using upclass}
+
+\author{Niamh Russell\\University College Dublin \And 
+       Laura Cribbin\\University of Limerick \And
+        Thomas Brendan Murphy\\University College Dublin}
+\title{\pkg{upclass}: An \proglang{R} Package for Updating Model-Based Classification Rules}
+
+
+\Plainauthor{Niamh Russell, Laura Cribbin, Thomas Brendan Murphy} 
+
+\Plaintitle{upclass: An R Package for Updating Model-Based Classification Rules} 
+\Shorttitle{\pkg{upclass}: Classification Using Updated Classification Rules in \proglang{R}} 
+
+\Abstract{
+Standard methods for classification use labeled data to establish criteria for assigning unlabeled data to groups. However, the unlabeled data which need to be classified often contain important information about the structure of the groups, despite the group membership of these observations being unknown. A new \proglang{R} package called \pkg{upclass} is presented which  uses both labeled and unlabeled data to construct a model-based classification method.
+The method uses the EM algorithm to obtain maximum likelihood estimates of the model parameters and classifications for the unlabeled data. It can be shown to perform better than classical methods, particularly in cases where few observations are labeled.
+}
+\Keywords{classification, EM algorithm, \pkg{mclust}, \proglang{R}, semi-supervised classification}
+\Plainkeywords{classification, EM algorithm, mclust, R, semi-supervised classification} 
+
+
+\Address{
+  Niamh Russell\\
+  Complex and Adaptive Systems Laboratory\\
+  \& School of Mathematical Sciences \\
+  Belfield Office Park\\
+  Clonskeagh\\
+  Dublin 4.\\
+  E-mail: \email{niamh.russell.1@ucdconnect.ie}\\
+}
+
+
+
+
+
+\begin{document}
+<<echo=FALSE>>=
+### for sampling
+set.seed <- 1234
+@
+
+\section[Introduction]{Introduction}
+\label{Intro}
+Classification techniques are employed regularly in a wide variety of application areas. Examples include food science applications where studies are carried out to establish whether products are correctly labeled \citep[e.g.,][]{caetano2007,toher2007,toher2011}; botanical investigations to identify rare plants \citep[e.g.,][]{pouteau2012} and medical diagnostic applications to identify whether patients have a particular disease or condition \citep[e.g.,][]{fan2011}.  It is important to devise effective rules in order to reduce potential errors.  
+
+Classification methods require a labeled dataset so that the number of groups and the structure of groups can be inferred. The task is to classify any unlabeled observations into the correct groups. Traditionally, a classification rule is developed using the fully labeled data which can then be used to classify any new unlabeled data as it becomes available. Extensive reviews of classification methods include \cite{ripley1996} and \cite{mclachlan1992}. 
+
+Semi-supervised classification methods use both the labeled \emph{and} unlabeled data to develop a classifier for the unlabeled observations. These methods exploit the idea that even though the group memberships of the unlabeled data are unknown, these data carry important information about the group parameters  \citep[e.g.,][]{mclachlan1977,oneill1978, dean2006, chapelle2006}. These methods provide a framework for updating a classification rule using unlabeled observations, so that more accurate classifications can be obtained. A number of semi-supervised classification methods have been developed including model-based methods \citep[e.g.,][]{dean2006,mcnicholas2010,murphy2010,toher2011} and machine learning methods \citep[e.g.,][]{joachims1999,wang2012}. Detailed reviews of semi-supervised classification include \cite{chapelle2006} and \cite{zhu2009}. 
+
+Herein, we present the \proglang{R} package \pkg{upclass} which implements the (semi-supervised) updated model-based classification method as developed in \cite{dean2006}. This method starts by estimating the unknown labels using a standard model-based classification method and then combines them with the labeled observations to form the complete-data. The EM algorithm is utilized where the parameters and estimated unknown labels are iteratively updated until convergence. This yields maximum likelihood estimates for the parameters in the model and estimates group membership for the unlabeled observations. 
+
+The methods for standard model-based classification and clustering are outlined in Section~\ref{sec:Classical} and the algorithm for the updated method is described in more detail in Section~\ref{sec:Updating}.
+
+In Section~\ref{sec:existing}, we present a short review of other semi-supervised methods, and outline what our package adds to the existing functionality.
+
+In Section~\ref{sec:Software}, we will illustrate the use of each function in the \pkg{upclass} package by working through examples using the well known olive oil data set \citep{forina1983}
+.
+In Section~\ref{sec:Compare}, we give a short comparison of the effectiveness of the updated method versus a fully supervised method for a case where only a small proportion of the data is labeled.	
+
+The \proglang{R} package implementing the methodology described in this article is available from the Comprehensive \proglang{R} Archive Network at \url{http://CRAN.R-project.org/package=upclass}.
+
+
+\section[Model-Based Methods]{Model-based methods}
+\label{sec:Classical}
+
+Discriminant analysis is concerned with classifying data into predefined groups while clustering sets out to cluster data into a previously undefined number of groups or clusters. In this section, we will outline the model-based approach to clustering (Section~\ref{sec:MBC}) and discriminant analysis (Section~\ref{sec:DA}). The updated classification method which will be developed in Section~\ref{sec:Updating} uses a hybrid of the statistical ideas underlying model-based discriminant analysis and clustering. 
+
+\subsection{Model-based clustering}
+\label{sec:MBC}
+Model-based clustering \citep{banfield1993, fraley2002,fraley2007} as implemented in the \pkg{mclust} package \citep{fraley2012} is used for clustering data into groups, where the number of groups $G$ is unknown. 
+
+Model-based clustering is formulated as follows, we assume that there are $G$ clusters, where each cluster $g$ arises with probability $\tau_g$ (where $\sum\tau_g=1$ and each $\tau_g$ is non-negative) and data within each cluster follows a normal distribution with cluster specific mean $\mu_g$ and covariance $\boldsymbol{\Sigma}_g$. That is, the data are characterized by a finite mixture of normal distributions. 
+
+Hence, the density of each observation can be given by,
+\begin{equation}
+f(y)=\sum^G_{g=1}\tau_g\phi(y|\mu_g,\boldsymbol{\Sigma}_g),\label{eq:mixmod}
+\end{equation} 
+\begin{eqnarray*}
+\textrm{where} & \phi(\cdot) & \textrm{is a multivariate normal density.}
+\end{eqnarray*}
+It is worth noting that the assumption of multivariate normal distributed clusters implies that the clusters are elliptical in shape. \cite{banfield1993} proposed that constraints be placed on the covariance matrices in such a way as to allow for
+different conformations for the elliptical clusters. A modified eigenvalue decomposition of $\boldsymbol{\Sigma}_g$ is used to implement these variations. This decomposition can be
+written as
+\begin{displaymath}
+\boldsymbol{\Sigma}_g=\lambda_g \mathbf{D}_g \mathbf{A}_g \mathbf{D}_g^T,
+\end{displaymath}
+\begin{eqnarray*}
+\textrm{where} \ \ \lambda_g &-& \textrm{is a constant which controls the cluster volume} \\
+\mathbf{D}_g &-& \textrm{is an orthogonal matrix of eigenvectors which control the} \\
+& & \textrm{orientation/direction of the clusters} \\
+\mathbf{A}_g &-& \textrm{is a diagonal matrix, with entries proportional to the} \\
+& & \textrm{eigenvalues, which control the shape of the cluster.}
+\end{eqnarray*}
+
+We can restrict  each part of the covariance $\boldsymbol{\Sigma}_g$ in different ways, resulting in fourteen different possible models \citep{biernacki2006}. Throughout this paper, we will consider the ten covariance structures implemented in \pkg{mclust} \citep{fraley2012}, as displayed in Figure~\ref{fig:ellipses} and Table~\ref{tab:models}. Each letter in the name of a model corresponds to the constraint
+placed on the volume, shape and orientation respectively. The constraint can be equal (E), variable (V) or identity (I). Consider, for example, the EEV model for the covariance. If data are fitted by this model, then each cluster has the same volume and the same shape but the orientation of each cluster is allowed to differ. 
+
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics{ellipses.pdf}
+\end{center}
+\caption{Examples of clusters under each covariance restriction.}
+\label{fig:ellipses}
+\end{figure}
+
+As shown in Figure~\ref{fig:ellipses}, the various covariance restrictions result in a different combination of cluster shapes in each model. The constraints yield parsimonious models which facilitate a more flexible modeling strategy beyond assuming unequal covariance (VVV) or equal covariance (EEE). 
+
+\begin{table}[htbp]
+\begin{center}
+\begin{tabular}{lllll}
+\hline \hline
+Model \T \B & Volume & Shape & Orientation & Covariance $\boldsymbol{\Sigma}_g$ \\
+\hline
+EII \T & Equal & Spherical &   & $\lambda \mathbf{I}$ \\
+VII & Variable & Spherical &   & $\lambda_g \mathbf{I}$ \\
+EEI & Equal & Equal & Axis aligned & $\lambda \mathbf{A}$ \\
+VEI & Variable & Equal & Axis aligned & $\lambda_g \mathbf{A}$ \\
+EVI & Equal & Variable & Axis aligned & $\lambda \mathbf{A}_g$ \\
+VVI & Variable & Variable & Axis aligned & $\lambda_g \mathbf{A}_g$ \\
+EEE & Equal & Equal & Equal & $\lambda \mathbf{D A D}^{\top}$ \\
+EEV & Equal & Equal & Variable & $\lambda \mathbf{D}_g \mathbf{A D}_g^{\top}$ \\
+VEV & Variable & Equal & Variable & $\lambda_g \mathbf{D}_g \mathbf{A D}_g^{\top}$ \\
+VVV \B & Variable & Variable & Variable & $\lambda_g \mathbf{D}_g \mathbf{A}_g \mathbf{D}_g^{\top}$ \\
+\hline
+\end{tabular}
+\caption[Covariance decompositions.]{Covariance decompositions available.}
+\label{tab:models}
+\end{center}
+\end{table}
+
+We will introduce some notation here, which will be used throughout.
+Let $(\Xtrain,\mathrm{\textbf{l}}_N)$ be the labeled data, where the observations are denoted by $\Xtrain=(x_1,x_2,\ldots,x_N)$ and their
+labels by $\cltrain=(l_1,l_2,\ldots,l_N)$. The unlabeled data will be represented by $\Xtest$ where $\Xtest=(y_1,y_2,\ldots,y_M)$ and the
+unknown labels are $\cltest=(z_1,z_2,\ldots,z_M)$.\\
+The model parameters are estimated using maximum likelihood via the EM algorithm \citep{dempster1977}. The EM
+algorithm, a technique used to find maximum likelihood estimates in cases where there are missing data, is made up of two steps, the
+Expectation (E) and the Maximization (M) steps. Since the data are from a mixture model, (See Equation~\ref{eq:mixmod})
+
+we can write the likelihood as the product over this density, evaluated at each $y_{m}$,\\
+
+\begin{equation}
+L(\tau,\mu,\boldsymbol{\Sigma}|\Xtest)=\prod^M_{m=1}\left[\sum^G_{g=1}\tau_g\phi({y}_m|\mu_g,\boldsymbol{\Sigma}_g)\right],\label{eq:MBClike}
+\end{equation}
+and the log-likelihood as
+\begin{displaymath}
+l(\tau,\mu,\boldsymbol{\Sigma}|\Xtest)=\sum^M_{m=1}\log\left[\sum^G_{g=1}\tau_g\phi({y}_m|\mu_g,\boldsymbol{\Sigma}_g)\right],
+\end{displaymath}
+where $\tau=(\tau_1,\tau_2,\ldots,\tau_G)$, $\mu=(\mu_1,\mu_2,\ldots,\mu_G)$ and $\boldsymbol{\Sigma}=(\boldsymbol{\Sigma}_1,\boldsymbol{\Sigma}_2,\ldots,\boldsymbol{\Sigma}_G)$.
+
+It is difficult to maximize the log-likelihood directly because the log-likelihood is expressed as the log of a summation. To resolve this, we introduce indicator variables, $z_{mg}$, which represent the unknown labels of each observation,
+\begin{displaymath}
+\textrm{where} \ \ z_{mg} = \left\{ \begin{array}{ll}
+1 & \mbox{if ${y}_m$ is from group $g$} \\
+0 & \mbox{otherwise}.
+\end{array} \right.
+\end{displaymath}
+The complete-data likelihood can now be written as
+\begin{equation}
+L(\tau,\mu,\boldsymbol{\Sigma}|\Xtest,\cltest)=\prod_{m=1}^{M}\prod_{g=1}^G\left[\tau_g \phi(y_m|\mu_g,\boldsymbol{\Sigma}_g)\right]^{z_{mg}},\label{eq:MBCcomplike}
+\end{equation}
+and the complete-data log-likelihood is of the form
+\begin{equation}
+l(\tau,\mu,\boldsymbol{\Sigma}|\Xtest,\cltest)=\sum^M_{m=1}\sum^G_{g=1}z_{mg}\left[\log \tau_g+\log \phi(y_m|\mu_g,\boldsymbol{\Sigma}_g)\right].\label{eq:MBCcomplog}
+\end{equation}
+The E-step of the algorithm replaces the $z_{mg}$ values in Equation~\ref{eq:MBCcomplog} with their conditional expected values, which are of the form
+\begin{equation}
+\label{eq:z}
+\hat{z}_{mg}=\frac{\hat{\tau}_{g}\phi(y_m|\hat{\mu}_{g},\hat{\boldsymbol{\Sigma}}_g)}{\sum_{g'=1}^{G}\hat{\tau}_{g'}\phi(y_m|\hat{\mu}_{g'},\hat{\boldsymbol{\Sigma}}_{g'})},
+\text{ for all }m=1,...,M, \text{ and }g=1,...,G.
+\end{equation}
+thus yielding the expected complete-data log-likelihood. 
+
+The M-step of the algorithm maximizes the expected complete-data log-likelihood function. The algorithm is iterated until convergence of the log-likelihood is reached and the final $z_{mg}$ values provide the posterior probability that observation $m$ belongs to group $g$. 
+
+Each observation is then classified to the group with maximum {\em a posteriori} (MAP) probability. 
+
+Further details on the EM algorithm are provided in Section~\ref{sec:Updating}, where the version of the algorithm for the updated method of model-based classification is described.
+
+\subsection{Model-based discriminant analysis}
+\label{sec:DA}
+Two classical supervised classification methods are linear (LDA) and quadratic (QDA) discriminant analysis. Both methods can be seen as model-based discriminant analysis methods based on a similar model to that outlined in Section~\ref{sec:MBC} but where the group membership for each observation is known. When implementing LDA, the covariance matrix is assumed equal for each
+group, which corresponds to the EEE covariance structure; whereas in QDA, each group is allowed to have its own unconstrained covariance matrix, which corresponds to the VVV covariance structure. It's possible, of course, to carry out supervised classification with all the Mclust models, as we will show in Sections~\ref{sec:noupclassify} and \ref{sec:Compare}.
+
+In the context of supervised classification, there are two types of data: labeled data for which the group memberships are known and unlabeled data where they are unknown. Supervised classification uses labeled data to estimate model parameters which are used to create a classification rule. This rule can then be used to classify the unlabeled data. 
+
+Keeping the notation of Section~\ref{sec:MBC}, the likelihood of the labeled data can be written as:
+
+\begin{equation}
+L(\tau,\mu,\boldsymbol{\Sigma}|\Xtrain,\cltrain) = \prod_{n=1}^N \prod_{g=1}^G [\tau_g \phi(x_n|\mu_g,\boldsymbol{\Sigma}_g)]^{l_{ng}}.\label{eq:DAlike}
+\end{equation}
+Hence, the log-likelihood is
+\begin{displaymath}
+l(\tau,\mu,\boldsymbol{\Sigma}|\Xtrain,\cltrain) = \sum_{n=1}^N \sum_{g=1}^G l_{ng}[\log \tau_g + \log \phi(x_n|\mu_g,\boldsymbol{\Sigma}_g)].
+\end{displaymath}
+
+\begin{displaymath}
+\textrm{where} \ \ l_{ng} = \left\{ \begin{array}{ll}
+1 & \mbox{if ${x}_n$ belongs to group $g$} \\
+0 & \mbox{otherwise}.
+\end{array} \right.
+\end{displaymath}
+
+The function $l(\tau,\mu,\boldsymbol{\Sigma}|\Xtrain,\cltrain)$ can be maximized with respect to $(\tau_g,\mu_g,\boldsymbol{\Sigma}_g)$ to obtain maximum likelihood estimates for the parameters
+($\hat{\tau}_g, \hat{\mu}_g, \hat{\boldsymbol{\Sigma}}_g$) in the model. Using these estimates, calculated from the labeled data, the expected value of the unknown labels $\cltest$ can be computed. They will have the same form as in Equation~\ref{eq:z}. 
+
+As before, the {\em a posteriori} probabilities of group membership for each observation can be used to derive the maximum {\em a posteriori} (MAP) predicted group membership for each observation.
+
+\subsection{Model selection}
+\label{sec:BIC}
+In implementing model-based discriminant analysis and clustering techniques, the model of the data must be known. If the model is not known, it
+is recommended to fit every model to the data and calculate the Bayesian Information Criterion (BIC) value \citep{schwarz1978,kass1995} for each model. The BIC value is calculated in such a way where it penalizes for a large number of parameters and rewards for a large likelihood value.
+
+\begin{displaymath}
+\textrm{BIC}=2 \log (L)-k \log (n)
+\end{displaymath}
+\begin{eqnarray*}
+\textrm{where} \ \
+L &-& \textrm{is the likelihood of the data} \\
+k &-& \textrm{is the number of estimated model parameters} \\
+n &-& \textrm{is the number of observations}.
+\end{eqnarray*}
+
+The model with the highest BIC value is selected. While this does not always guarantee the lowest misclassification rate, in practice
+ it
+often selects a close to optimal model \citep{biernacki1999}. \cite{biernacki1999} provide an overview of other model selection criteria for model-based clustering and classification. 
+
+
+\section[Updating]{The new updating method}
+\label{sec:Updating}
+The backbone of the method employed by \pkg{upclass}  is the idea that the unlabeled data may potentially contain important information about the overall data  even though their group memberships are unknown \citep{dean2006}. This information can help give a clearer picture of the structure of the groups in the data. Earlier work in using labeled data to update model-based classification rules has been carried out by \cite{mclachlan1975,mclachlan1977}, \cite{ganesalingam1978} and
+\cite{oneill1978} amongst others. More recent work includes \cite{nigam2006}, \cite{mcnicholas2010} and \cite{murphy2010}.
+
+We have observed $(\Xtrain,\cltrain,\Xtest)$ and unknown $\cltest$. So the observed likelihood is of the form
+\begin{equation}
+L(\tau,\mu,\boldsymbol{\Sigma}|\Xtrain,\cltrain,\Xtest) = \underbrace{\prod_{n=1}^N\prod_{g=1}^G\left[\tau_g \phi(x_n|\mu_g,\boldsymbol{\Sigma}_g)\right]^{l_{ng}}}_{\text{labeled data}}
+\underbrace{\prod^M_{m=1}\left[\sum^G_{g=1}\tau_g\phi(y_m|\mu_g,\boldsymbol{\Sigma}_g)\right]}_{\text{unlabeled data}};\label{eq:like}
+\end{equation}
+this is the product of the likelihood for model-based discriminant analysis (Equation~\ref{eq:DAlike}) and model-based clustering (Equation~\ref{eq:MBClike}). 
+If we treat the unknown labels as missing data, we can write the likelihood for the complete-data as
+\begin{equation}
+L_c(\tau,\mu,\boldsymbol{\Sigma}|\Xtrain,\cltrain,\Xtest,\cltest)=\underbrace{\prod^N_{n=1}\prod^G_{g=1}\left[\tau_g\phi(x_n|\mu_g,\boldsymbol{\Sigma}_g)\right]^{l_{ng}}}_{\text{labeled data}}
+    \underbrace{\prod^M_{m=1}\prod^G_{g=1}\left[\tau_g\phi(y_m|\mu_g,\boldsymbol{\Sigma}_g)\right]^{z_{mg}}}_{\text{unlabeled data}};\label{eq:complike}
+\end{equation}
+this is a product of the likelihood for model-based discriminant analysis (Equation~\ref{eq:DAlike}) and the complete-data likelihood for model-based clustering (Equation~\ref{eq:MBCcomplike}). 
+
+The package uses the complete-data log likelihood (Equation~\ref{eq:complike}) and the EM algorithm to find maximum likelihood estimates for the unknown parameters of the model. The algorithm then uses these estimated parameters to classify the unlabeled data.
+
+\subsection{How it works}
+\label{sec:HIW}
+There are four general steps used to implement this updated classification rule. They iterate through the EM algorithm and are made up of the
+following:
+\begin{description}
+    \item[Step 1] Let $k=0$. Find initial values for the parameter estimates in the model. Only the labeled data $(\Xtrain,\cltrain)$ are used here along with the M-step of the EM algorithm. This is equivalent to performing classical model-based discriminant analysis to obtain starting values for the model parameters, but within the structure of the \pkg{mclust} models.
+    \item[Step 2] Using the current parameter estimates, $\hat{\tau}^{(k)}$, $\hat{\mu}^{(k)}$ and $\hat{\boldsymbol{\Sigma}}^{(k)}$, calculate the expected value of the unknown labels through the E-step,
+    \begin{displaymath}
+    \hat{z}^{(k+1)}_{mg}=\frac{\hat{\tau}^{(k)}_g\phi(y_m|\hat{\mu}^{(k)}_g,\hat{\boldsymbol{\Sigma}}_g^{(k)})}{\sum^G_{g'=1}\hat{\tau}^{(k)}_{g'}\phi(y_m|\hat{\mu}^{(k)}_{g'},\hat{\boldsymbol{\Sigma}}_{g'}^{(k)})}.
+    \end{displaymath}
+    \item[Step 3] Combine $(\Xtrain,\cltrain)$ and $(\Xtest,\hat{\textbf{z}}^{(k+1)}_{M})$ to form the complete-data. Using the complete-data, calculate new parameter estimates for the model, $\tau^{(k+1)}$, $\mu^{(k+1)}$ and $\boldsymbol{\Sigma}^{(k+1)}$, through the M-step by maximizing the complete-data log-likelihood (Equation~\ref{eq:complike}).
+    \item[Step 4] Check for convergence of the log-likelihood using the Aitken acceleration convergence criterion, by default. There is a simpler convergence option also, see Section~\ref{sec:Aitken}. If convergence has been reached, stop. If not, set $k=k+1$ and return to Step 2 where new estimates for the unknown labels are calculated followed by new parameter estimates.
+\end{description}
+
+We chose to use the labeled data to calculate the initial parameter estimates. \cite{toher2007} did some work on this and showed that, in most cases, this was the most effective method. 
+
+The parameter estimates used in Step 3 are of the following form. The estimate of $\hat{\tau}_g^{(k+1)}$ can be seen as the average number of observations in each group,
+\begin{displaymath}
+\hat{\tau}_g^{(k+1)}=\frac{\sum^N_{n=1}l_{ng}+\sum^M_{m=1}\hat{z}^{(k+1)}_{mg}}{N+M},
+\end{displaymath}
+and $\hat{\mu}_g^{(k+1)}$ is a weighted average of the observations, where the labels and their estimates are used as weights,
+\begin{displaymath}
+\hat{\mu}_g^{(k+1)}=\frac{\sum^N_{n=1}l_{ng}\mathrm{x}_n+\sum^M_{m=1}\hat{z}^{(k+1)}_{mg}\mathrm{y}_m}{\sum^N_{n=1}l_{ng}+
+    \sum^M_{m=1}\hat{z}^{(k+1)}_{mg}}.
+\end{displaymath}
+The estimation of $\boldsymbol{\Sigma}_g$ depends on the constraints placed on the covariance matrix. For example, if the model was VVV, the estimate for $\hat{\boldsymbol{\Sigma}}_g^{(k+1)}$ would look like;
+$$
+\hat{\boldsymbol{\Sigma}}_g^{(k+1)}= \frac{\sum^N_{n=1}l_{ng}(\mathrm{\textbf{x}}_n-\hat{\mu}_g^{(k+1)})(\mathrm{\textbf{x}}_n-\hat{\mu}_g^{(k+1)})'+\sum^M_{m=1}\hat{z}_{mg}^{(k)}(\mathrm{\textbf{y}}_m-\hat{\mu}_g^{(k+1)})(\mathrm{\textbf{y}}_m-\hat{\mu}_g^{(k+1)})'}
+    {\sum^N_{n=1}l_{ng}+\sum^M_{m=1}\hat{z}_{mg}^{(k)}}.
+$$
+For further details on parameter estimation and how the covariance matrix for each model can be calculated, see \cite{bensmail1996}. 
+
+Once the
+final converged estimates of the model have been obtained, these maximize the observed-data likelihood (Equation~\ref{eq:like}). The resulting parameters and $\hat{z}_{mg}$ values form the updated
+classification rule.
+
+
+\section{Where our package fits into existing software}
+\label{sec:existing}
+
+There are some existing \proglang{R} packages that offer functionality for semi-supervised classfication. 
+
+One such package is \pkg{bgmm}, written by \citet{biecek2012}, which has parallels with the \pkg{upclass} functionality in that it can be used for mixture models and it also allows for restrictions on the covariance matrices.
+The \pkg{bgmm} models are codified with four-letter strings, the first of which relates to the mean vectors of the components, which can be the same or different. \pkg{mclust} does not do this, so the first letter of the string does not appear in our comparison in table~\ref{tab:bgmm}.
+The second and third  letters relate to the \emph{between} covariance and \emph{within} covariance matrices of the groups, which can either be equal (\code{"E"}) or different (\code{"D"}). The fourth letter letter relates to the covariances in each covariance matrix which can all be forced to be zero (\code{"0"}) or different (\code{"D"}).
+ We can summarise the models offered in the two packages in table~\ref{tab:bgmm}.\\
+\begin{table}[htbp]
+\begin{center}
+\begin{tabular}{ll}
+\hline \hline
+\pkg{upclass}  & \pkg{bgmm} \\
+\hline
+EII &E E 0 \\
+VII &D E 0 \\
+EEI &E D 0 \\
+VEI & \\
+EVI & \\
+VVI &D D 0 \\
+EEE &E D D \\
+EEV & \\
+VEV &\\
+VVV &D D D \\
+&E E D\\
+&D E D\\
+\hline
+\end{tabular}
+\caption[Comparison of models available in \pkg{upclass} and \pkg{bgmm}.]{Comparison of models available in \pkg{upclass} and \pkg{bgmm}.}
+\label{tab:bgmm}
+\end{center}
+\end{table}
+
+Six of the \pkg{bgmm} models are handled by \pkg{upclass} as they are equivalent to existing models in \pkg{mclust}. Moreover, \pkg{mclust} provides four additional covariance matrix structures.
+
+\pkg{bgmm} offers two interesting diagonal models, not proposed by \pkg{mclust}, which are highly parsimonious, and take advantage of compound symmetry covariance.
+
+ Other packages which provide support for semi-supervised classification are \pkg{spa}, written by \citet{culp2011} and \pkg{phyclust}, written by \citet{chen2011}. However, \pkg{spa} is designed for graph-based estimation and linear regression, and not for mixture models. \pkg{phyclust} does propose a mixture model, but the package is specifically geared towards DNA sequence data, rather than towards food data.
+
+Therefore, we believe our package adds something new in the arena of semi-supervised classification. For completeness, we have included some supervised classification functions, for comparison purposes but they are not the main focus of the package.
+
+\section[Software]{The software}
+\label{sec:Software}
+
+In this section we will discuss how to use the package \pkg{upclass} in \proglang{R} \citep{R}. 
+It can be implemented in semi-supervised mode or in supervised mode. It makes extensive use of the package \pkg{mclust} \citep{fraley2012}. If \pkg{mclust} is not installed, \pkg{upclass} will install it.
+
+The package is available on CRAN and can be installed using the following code.
+<<echo=FALSE>>=
+rnorm(10)
+@
+
+\begin{CodeInput}
+R> install.packages("upclass")
+R> library("upclass")
+\end{CodeInput}
+
+\subsection{Summary of functions available in the package}
+The \proglang{R} package \pkg{upclass} contains the following functions. The use of these will be outlined in the following sections. The most important of these is \code{upclassify()} and this will be described in most detail.
+
+\begin{itemize}
+\item The function \code{Aitken()} calculates the Aitken acceleration estimate of the final converged maximized log-likelihood.
+\item The function \code{modelvec()} list the valid model names to be used in the \pkg{upclass} package for univariate and multivariate data
+\item The function \code{noupclassify()} is used to carry out supervised classification over a range of different models and find the model that best fits the data. 
+\item The function \code{noupclassifymodel()} is an internal work function used by \code{noupclassify}. 
+\item The function \code{plot.upclassfit()} is a method used to produce a plot of the best model found by \code{upclassify} or \code{noupclassify}.
+\item The function \code{print.upclassfit()} is the \code{print} method for the user defined class used by \pkg{upclass}. 
+\item The function \code{summary.upclassfit()} is the \code{summary} method for the user defined class used by \pkg{upclass}. 
+\item The function \code{upclassify()} is the main function in the package. It is used to carry out semi-supervised classification over a range of different models and find the model that best fits the data.  
+\item The function \code{upclassifymodel()} is an internal work function used by \code{upclassify}. 
+\end{itemize}
+
+\subsection{Setting up the data}
+\label{sec:setup}
+To illustrate the use of the functions in \pkg{upclass}, we will employ the olive oil dataset \citep{forina1983}. The dataset is found in the \pkg{classifly} package developed by \cite{classifly}. We will set up the data in the following way. 
+\begin{CodeInput}
+R> data("olives")
+R> set.seed(11)
+R> X <- as.matrix(olives[,-c(1:2)])
+R> cl <- olives[,1]
+R> N <- dim(X)[1]
+R> indtrain <- sort(sample(1:N, N * 0.2))
+R> Xtrain <- X[indtrain,]
+R> cltrain <- cl[indtrain]
+R> indtest <- setdiff(1:N, indtrain)
+R> Xtest <- X[indtest,]
+R> cltest <- cl[indtest]
+\end{CodeInput}
+This assigns 20\% of the data (114 observations) as labeled data (\code{Xtrain}, \code{cltrain}), where \code{Xtrain} are the observations and  \code{cltrain} are their labels. The remaining data (458 observations) are to be thought of as unlabeled. The observations are stored as \code{Xtest}, and their removed labels as \code{cltest}.
+
+Note that we deliberately set the seed at 11, as this is a tricky cut of the data. Setting the seed at 1, for example, gives excellent classification results from both supervised and semi-supervised methods.
+
+\subsection[The function Aitken()]{The function \code{Aitken()}}
+\label{sec:Aitken}
+This internal function takes in a vector of three consecutive log-likelihoods and estimates the final converged maximized log-likelihood using the method of Aitken acceleration described by \cite{bohning1994}.\\ The calling functions can then decide if the log-likelihood has converged based on some specified tolerance, defaulted to $10^{-5}$ in the case of the \pkg{upclass} functions. When using \code{Aitken()}, specify the following argument. 
+\begin{itemize}
+\item \code{ll} A vector of three consecutive log-likelihoods.
+\end{itemize}
+In practice, Aitken acceleration needs three values of the log-likelihood, so at the start of the algorithm, the calling function should initialise the three components of \code{ll} to $-\infty$, and each iteration of the algorithm should update the vector by moving the components along. This results in a minimum of three iterations being required for any algorithm using Aitken acceleration as a convergence tool.
+
+This function could, of course, be used by itself, as in the following snippet.
+\begin{CodeChunk}
+\begin{CodeInput}
+R> ll <- c(-261, -257.46,-256.4)
+R> Aitken(ll)
+\end{CodeInput}
+\begin{CodeOutput}
+$ll
+[1] -256.4
+
+$linf
+[1] -254.8869
+
+$a
+[1] 0.299435
+\end{CodeOutput}
+\end{CodeChunk}
+\code{ll} gives the current estimate for the log-likelihood, while \code{linf} gives the estimate of the converged value and if the difference between the two should be less than some specified tolerance, convergence can be said to have been reached.
+
+\subsection[The function modelvec()]{The function \code{modelvec()}}
+\label{sec:modelvec}
+The internal function \code{modelvec()} stores the valid \pkg{mclust} models in two character vectors, the first for univariate data and the second for multivariate data for use by other \pkg{upclass} functions. When using \code{modelvec()}, specify the following argument. 
+\begin{itemize}
+\item \code{d} The dimension of the data being used.
+\end{itemize}
+If \code{d} is 1, the data is considered to be univariate, and a vector containing the two univariate models handled by \pkg{mclust} are returned. Otherwise, the vector will contain the ten multivariate \pkg{mclust} models, as shown.
+
+\begin{CodeInput}
+R> modelvec(1)
+\end{CodeInput}
+\begin{CodeOutput}
+[1] "E" "V"
+\end{CodeOutput}
+\begin{CodeInput}
+R> modelvec(2)
+\end{CodeInput}
+\begin{CodeOutput}
+ [1] "EII" "VII" "EEI" "VEI" "EVI" "VVI" "EEE" "EEV" "VEV" "VVV"
+\end{CodeOutput}
+
+\subsection[The function upclassify()]{The function \code{upclassify()}}
+\label{sec:upclassify}
+The function \code{upclassify()} is used to classify unlabeled data by the semi-supervised method described in section~\ref{sec:HIW}. It produces estimates for the labels of the data, as well as model parameters for the models requested. In addition, it provides quantifiable goodness of fit measures as will be described below. Below is a list of \code{upclassify}'s arguments. Note that the first three must always be included. The remainder are optional.
+
+\begin{itemize}
+\item \code{Xtrain} The labeled data - A numeric matrix of data where rows correspond to observations and columns correspond to variables. The group membership of each observation is known.
+\item \code{cltrain} A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtrain}
+\item \code{Xtest} The unlabeled data - A numeric matrix of data where rows correspond to observations and columns correspond to variables. The group membership of each observation will usually not be known.
+\item \code{cltest} An optional numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtest}. By default, these are not supplied and the function sets out to obtain them.
+\item \code{modelscope} A character string indicating the desired models to be tested. With default \code{NULL}, all available models are tested. The models available for univariate and multivariate data can be retrieved using function \code{modelvec()}.
+\item \code{tol} The tolerance required for convergence. The default is $10^-5$.
+\item \code{iterlim} The maximum number of iterations if convergence has not been reached. The default is 1000.
+\item \code{Aitken} Whether or not Aitken acceleration is to be used. The default is set to \code{TRUE}. A simpler convergence criterion can be used by setting \code{Aitken} to \code{FALSE}. This method achieves convergence when two successive values of \code{ll} have a difference smaller than \code{tol}. The simpler convergence criterion has been shown to be less strict than the Aitken one \citep{mcnicholas2010a}.
+\end{itemize}
+
+The function output for each model comprises a list of sublists, one for each model tried, and the best one, using the BIC criterion \citep{schwarz1978} , which is output first. Each sublist can be accessed by its model name, and the best one by the name \code{"Best"}.
+
+In the interests of brevity, we will list each entry in turn instead of showing the actual output.
+\begin{itemize}
+\item \code{$call} How to call the function and the order of its arguments.
+\item \code{$Ntrain} The number of observations in the training set.
+\item \code{$Ntest} The number of observation in the test set.
+\item \code{$d} The dimension of the data.
+\item \code{$G} The number of groups in the training data. The package will not try to assign the test data to any other groups.
+\item \code{$iter} The number of iterations taken.
+\item \code{$converged} Whether or not the algorithm has converged. If \code{$converged} is \code{FALSE}, then \code{$iter} will be the maximum number of iterations (specified in the function call).
+\item \code{modelName} The model considered in this run of the algorithm.
+\item \code{$parameters} A list of the final model parameters estimated by the algorithm.
+\begin{itemize}
+\item \code{$parameters$pro} The proportion of the data found to be in each group.
+\item \code{$parameters$mean} Mean vectors for each group.
+\item \code{$parameters$variance} A comprehensive list of variances and covariance matrices produced by \pkg{mclust}
+\end{itemize}
+\item \code{$train} A list of information about the training data. This will not have changed from before the run.
+\begin{itemize}
+\item \code{$train$z} A matrix containing the estimated probabilities that each observation in the training data belongs to each group. 
+\item \code{$train$cl} A vector containing the new labels of the training data.
+\item \code{$train$misclass} The number of misclassifications of the training data.
+\item \code{$train$rate} The misclassification rate expressed as a percentage.
+\item \code{$train$Brierscore} The Brier score for the training data. 
+\item \code{$train$tab} The misclassification table by group.
+\end{itemize}
+\item \code{$test} A list of information about the test data.
+\begin{itemize}
+\item \code{$test$z} A matrix containing the estimated probabilities that each observation in the test data belongs to each group. 
+\item \code{$test$cl} A vector containing the estimated labels of the test data. This derives from the $z$ matrix. Each observation is assigned to the group with the highest probability.
+\item \code{$test$misclass} The number of misclassifications of the test data.
+\item \code{$test$rate} The misclassification rate expressed as a percentage.
+\item \code{$test$Brierscore} The Brier score for the test data. See below for an explanation of the Brier score.
+\item \code{$test$tab} The misclassification table by group.
+\end{itemize}
+\item \code{$ll} The log likelihood of the data.
+\item \code{$bic} The Bayes Information Criterion for the specified model.
+\end{itemize}
+
+In our example, we have the test labels to hand so we can include them in our model. The function will therefore produce classification performance results. If we omitted the \code{cltest} argument, only the model name would be returned, similar to \pkg{mclust} clustering output.
+
+\begin{CodeInput}
+R> fitup <- upclassify(Xtrain, cltrain, Xtest,cltest)
+R> fitup
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name:  VVV 
+Total Misclassified:  8 
+Misclassification Rate:   1.747 %
+\end{CodeOutput}
+
+Note that the BIC criterion usually selects the model with the lowest misclassification rate, but not always. With this data split, the VVI model had no misclassifications but had a less satisfactory BIC than the VVV model. We can confirm this by interrogating the specific element of the output list.
+\begin{CodeInput}
+R> fitup[["VVI"]]$test$misclass
+\end{CodeInput}
+\begin{CodeOutput}
+[1] 0
+\end{CodeOutput}
+We confirm that the VVI model had no misclassifications. By comparing \code{fitup[["Best"]bic} and \code{fitup[["VVI"]bic}, we can see that the BIC for the \code{[["Best"]]}  model (VVV) is higher.
+\begin{CodeInput}
+R> c(fitup[["Best"]]$bic,fitup[["VVI"]]$bic)
+\end{CodeInput}
+\begin{CodeOutput}
+[1] -42866.66 -46763.30
+\end{CodeOutput}
+This is why the VVV model was chosen, as BIC can always be calculated, whether or not we have the labels.
+
+If we were interested in a full model list, for the VEV model for example, we could display it as follows.
+\begin{CodeInput}
+R> fitup[["VEV"]]
+\end{CodeInput}
+We omit the output.
+
+In order to classify our data for a smaller selection of models, we make use of the function \code{modelvec()}. If, for some reason, we were only interested in models with groups of equal size and shape, we could retrieve the \pkg{mclust} models EEI, EEE and EEV from \code{modelvec(2)}, and proceed to classify as follows.
+\begin{CodeInput}
+R> models <- modelvec(2)
+R> modelscope <- c(models[3],models[7],models[8])
+R> fitupEE <- upclassify(Xtrain, cltrain, Xtest, cltest, modelscope=modelscope)
+R> fitupEE
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name:  EEV 
+Total Misclassified:  19 
+Misclassification Rate:   4.148 %
+\end{CodeOutput}
+
+
+\subsubsection{How do we know it works?}
+Classification performance can be assessed using percentage misclassification error, provided we have the correct labels.
+
+In our original example, which we recap here, we used the code
+\begin{CodeInput}
+R> fitup <- upclassify(Xtrain, cltrain, Xtest,cltest)
+R> fitup
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name:  VVV 
+Total Misclassified:  8 
+Misclassification Rate:   1.747 %
+\end{CodeOutput}
+We can see that we got 8 observations misclassified, in this case, and a misclassification rate of 1.747\%, but of course, we had the labels to hand. This would not generally be the case.
+
+The Brier score  is another useful indication of the accuracy of a probabilistic model prediction, proposed by \citet{brier1950}. Brier's score gives an indication of how accurate the classifications are in terms of probability of group membership rather than just on the hard
+classification results. This is most useful when the correct labels are not available.
+\begin{displaymath}
+\textrm{Briers score }=\frac{100}{2M}\sum_{g=1}^{G}\sum_{m=1}^{M}(l^{mg}-z^{mg})^2,\\
+\end{displaymath}
+\begin{eqnarray*}
+\textrm{where }&l^{mg}& \textrm{are the labels finally assigned to each observation.}\\
+\textrm{and }&z^{mg}& \textrm{are their \emph{a posteriori} probabilities.}\\
+\end{eqnarray*}
+
+A perfect prediction gives a Brier score of zero. If $z^{mg}$ is a hard classification rather than the probability of observation $m$ belonging to group $g$, then the Brier score becomes equivalent to the percentage misclassification error. 
+
+When classifying any dataset, some observations may be classified into the correct group, but the probability of membership of that group may not be much larger than the probability of membership of the other groups. Such observations con-
+tribute more to the Brier score than definitively correctly classified observations. Likewise,
+some observations may be incorrectly classified, but the probability of belonging to the correct group is not much lower than that of the chosen group. These observations contribute less to the Brier score than definitively incorrectly classified
+observations. 
+
+Overall, therefore, the Brier score can be used as an approximation to the misclassification rate, if the latter is not available. 
+
+The Brier score can be retrieved from the output as follows. For the example above:
+\begin{CodeInput}
+R> fitup[["Best"]]$test$Brierscore
+\end{CodeInput}
+\begin{CodeOutput}
+[1] 1.744615
+\end{CodeOutput}
+This is a little lower than the misclassification rate of 1.747\% indicating that the incorrectly classified observations have slightly higher uncertainty associated with them, whereas correctly classified observations have high probability of belonging to the correct group, \citep{toher2007}.
+
+
+For our other example, \code{fitupEE}, where we have restricted the classification to those models of equal size and shape, we get 
+\begin{CodeInput}
+R> fitupEE[["Best"]]$test$Brierscore
+\end{CodeInput}
+\begin{CodeOutput}
+[1] 4.148472
+\end{CodeOutput}
+We can see that this is very close to the misclassification rate.
+
+\subsection[The function upclassifymodel()]{The function \code{upclassifymodel()}}
+This is an internal function used by \code{upclassify()} and should not be used on its own. Full details of arguments and output are in the  relevant \proglang{R} helpfile, if required.
+
+\subsection[The function noupclassify()]{The function \code{noupclassify()}}
+\label{sec:noupclassify}
+This function is included in the package for convenience. It allows the user to classify data based on a rule derived from the training set, while taking advantage of \pkg{mclust}'s covariance structures. 
+
+The arguments and the output list are the same as for \code{upclassify()} so will not be listed again. The \code{print()}, \code{summary()} and \code{plot()} methods are also common to both functions.
+
+Still using the 20\% labeling example, we can run \code{noupclassify()} as we would expect.
+\begin{CodeInput}
+R> noupclassify(Xtrain, cltrain, Xtest,cltest)
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name:  VVV 
+Total Misclassified:  31 
+Misclassification Rate:   6.769 %
+\end{CodeOutput}
+
+As before, if we do not have the labels, just the model chosen is returned by the \code{print()} method. The full output can be interrogated in the same way as for \code{upclassify}.
+
+
+\subsection[The function noupclassifymodel()]{The function \code{noupclassifymodel()}}
+Like \code{upclassifymodel()}, this is an internal function and is not designed to be used on its own and full details of arguments and output are in the \proglang{R} helpfile, if required.
+
+\subsection[Customised methods for upclass]{User defined methods for \pkg{upclass}}
+Both \code{upclassify} and \code{noupclassify} have output with the user-defined class of \code{upclassfit}. A \code{print()} and a \code{summary()} for this class of output has been developed. The \code{print()} has already been detailed for cases where we have labels for the test data. If we do not have these, the \code{print()} method only returns the selected model. Using our example above with the EE* models, we would get
+\begin{CodeInput}
+R> fitupEEnl <- upclassify(Xtrain,cltrain,Xtest,modelscope=modelscope )
+R> fitupEEnl
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name:  EEV 
+\end{CodeOutput}
+
+ The output from \code{summary()} is slightly more extensive. 
+\begin{CodeInput}
+R> summary(fitupEEnl)
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name
+ EEV 
+Log Likelihood
+ -21517.02 
+Dimension
+ 8 
+Ntrain
+ 114 
+Ntest
+ 458 
+bic
+ -43783.23 
+\end{CodeOutput}
+and with a little more if we have the labels.
+\begin{CodeInput}
+R> summary(fitup)
+\end{CodeInput}
+\begin{CodeOutput}
+Model Name
+ VVV 
+Log Likelihood
+ -21007.94 
+Dimension
+ 8 
+Ntrain
+ 114 
+Ntest
+ 458 
+bic
+ -42866.66 
+Total Misclassified:  8 
+Misclassification Rate:   1.747 %
+\end{CodeOutput}
+Any of the other output generated by \code{upclassify()} or \code{noupclassify()} can always be interrogated from the list. See Sections~\ref{sec:upclassify} and~\ref{sec:noupclassify}.
+
+
+There is also a \code{plot()} function which shows the $z$ values of the test data in graphical form. Problem points can easily be identified. See figure~\ref{fig:matplot}. 
+
+It should be noted that we left the label percentage at 20\% but we changed the data set-up described in Section~\ref{sec:setup} to use \code{set.seed(4)}.  This was to get plots with some less clearcut classifications. We used \code{fitup4} and \code{fitnoup4} as the names for our new fitted models to avoid ambiguity.
+
+The plot for the \code{upclassify()} output follows.
+
+
+\begin{CodeInput}
+R> fitup4 <- upclassify(Xtrain, cltrain, Xtest,cltest)
+R> plot(fitup4)
+\end{CodeInput}
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.5\textwidth]{matplot.pdf}
+\end{center}
+\caption[Olive oil data: Output of plot() function.]{Z-values of a test subset of the olive oil data, using semi-supervised classification.}
+\label{fig:matplot}
+\end{figure}
+
+We can see that most points are classified with a $z_{ig}$ value of very close to 1 or 0, indicating a very high probability of belonging to a particular group, and a correspondingly low probability of belonging to any of the other groups, resulting in a straightforward classification decision.
+
+However if we look at observation 266 in the output's test $z$-matrix, we can see that its values are less than ideal, with similar posterior probabilities of being in either group 1 or group 3.
+\begin{CodeInput}
+R> fitup4$Best$test$z[266,]
+\end{CodeInput}
+\begin{CodeOutput}
+[1] 5.532143e-01 9.056811e-15 4.467857e-01
+\end{CodeOutput}
+
+Although, \code{upclassify} will still classify this observation into group 1, the plot helps to show that this point may warrant further investigation.
+
+For interest, we also supply a plot of the \code{noupclassify()} output for the same cut of the data. It shows a difficulty in classifying the group 2 data, using this method.
+\begin{CodeInput}
+R> fitnoup4 <- noupclassify(Xtrain, cltrain, Xtest,cltest)
+R> plot(fitnoup)
+\end{CodeInput}
+\begin{figure}[htbp]
+\begin{center}
+\includegraphics[width=0.5\textwidth]{matplot2.pdf}
+\end{center}
+\caption[Olive oil data: Output of plot() function.]{Z-values of the same subset of the olive oil data, using supervised classification.}
+\label{fig:matplot2}
+\end{figure}
+\subsection{Comparing our method with supervised classification (using mclust)}
+\label{sec:Compare}
+We compare how our method performs compared to classification rules formed using the training data only using the olive oil data set \citep{forina1983} as an example.
+This data set is made up of eight variables which measure the percentage composition of eight fatty acids on 572 olive oils. Each oil is from one of three Italian regions; North Italy, South Italy and Sardinia. Note that we did not classify by geographical area within region, neither did we include this finer geographical area variable in our training/test data. 
+
+To carry out this comparison, we created a function called \code{noupclassify()} which uses the \code{mstep()} command in \pkg{mclust} and loops through the selected covariance structures. 
+
+The data were randomly split into training (labeled) and test (unlabeled) data with a given percentage being assigned as training data. This process was repeated 200 times and each time, we classified the split of the data using both methods. In each case, the best model was selected using BIC and the classification performance was recorded for this model. 
+
+The code for this simulation test appears in the appendix.
+
+Table~\ref{tab:oilpercent} shows the results of classification tests using model-based discriminant analysis and the updated method, and also the number of times each model was selected at each level. It can be seen that VVV is selected as the best model until only 15\% of the data are labeled. The VVV model, as the one with the most parameters, requires the training data to be of a certain size to work efficiently. On some data splits where fewer than 15\% of the observations are labeled, some groups had insufficient observations to fit the VVV model so simpler models were selected; in these cases the selected models enumerated by the numbers in brackets. The variance of the misclassification rates is displayed in square brackets.
+
+
+\begin{table}[htbp]
+\begin{center}
+\begin{tabular}{crrcrrrcr}
+\hline \hline
+Labeled \T \B & Classical && Models && Updated&& Models&\\
+data & method & & & method & & \\
+\hline
+  90\%\T &0.08& [0.128]&VVV&  &0.04 &[0.073]&VVV&\\
+  80\% & 0.10 &[0.077]&VVV &&0.07 &[0.056]&VVV& \\
+  70\% & 0.15 &[0.093]&VVV &&0.08 &[0.041]&VVV &\\
+  60\% & 0.19 &[0.093]&VVV &&0.09 &[0.036]&VVV &\\
+  50\% & 0.32 &[0.174]& VVV && 0.12 &[0.064]& VVV \\
+%&& EEE(6)&&&&\\
+  40\% &0.45  &[0.230]&VVV  &&0.16 &[0.095]&VVV&\\
+  30\% & 0.79 &[0.531]& VVV &&0.25 &[0.239]&VVV&\\
+  20\% & 2.24 &[5.474]&VVV && 0.57 &[0.989]& VVV&\\
+  15\% & 5.04 &[19.06]&VVV&(195) &1.29 &[6.541]&VVV&(194) \\
+&&&VEV&(2)&&&VEV&(6)\\
+&&&EEE&(3)&&&\\
+  10\%&11.46 &[47.01]&VVV &(141) &3.30 &[23.44]&VVV &(137) \\
+&&&VEV&(42)&&&VEV&(59)\\
+&&\B&EEE&(17)&&&EEV&(10)\\
+\hline
+\end{tabular}
+\caption[Olive oil data: Percentage of labeled data versus the average misclassification rate from the classical and
+updated methods.]{Olive oil data: The percentage of labeled data versus the average misclassification rate (reported as a percentage) for the
+classical and updated methods. The frequency that each covariance structure was selected is also shown.}
+\label{tab:oilpercent}
+\end{center}
+\end{table}
+
+The results in Table~\ref{tab:oilpercent} show the updated method outperforming the classical method at \emph{every} level, although the methods show comparable results when more than 30\% of the data are labeled. However, at the 30\% level and lower, the results from the updated method far surpass those from the classical method. 
+
+At the 10\% level, the difference between the two methods is very apparent. In this case, 515 observations are unlabeled out of the total of 572. The classical method misclassified nearly 11.5\% of the unlabeled observations, which corresponds to 59 observations. The updated method has misclassified only 3.3\% of the unlabeled data, which corresponds to only 17 observations. 
+
+Figure~\ref{fig:misclass} compares the results of the two methods for each of the 200 
+iterations at the 10\% level of labeled data. 
+
+\begin{figure}[htbp]
+\begin{center}
+\begin{tabular}{cc}
+\includegraphics[width=0.375\textwidth]{misclass1.pdf} &
+\includegraphics[width=0.375\textwidth]{misclass2.pdf}\\
+(a) & (b)\\
+\end{tabular}
+\end{center}
+\caption[Olive oil data: Comparing the classical and updated methods at the 10\% level.]{Olive oil data: Comparing the classical and updated
+methods at the 10\% level: (a) shows the difference in the number of misclassified observations for the classical and updated methods. (b) shows a scatter plot of the number of misclassified observations for the classical and updated methods.}
+\label{fig:misclass}
+\end{figure}
+
+Figure~\ref{fig:misclass}(a) shows that the updated method almost always gives better results than the classical method. The updated method yielded a lower misclassification rate on 188 iterations out of 200, the same misclassification rate on 3 iterations and an inferior misclassification rate on 9 iteration. Figure~\ref{fig:misclass}(b) shows the number of observations that were misclassified by each method on each iteration. On 24 iterations, the classical method misclassified at least 20\% of the unlabeled observations reaching a maximum of misclassifying almost 30\% of the unlabeled observations for one iteration. 
+
+\section[Discussion]{Discussion}
+We have presented a problem in data classification that occurs frequently in many areas, namely to classify unlabeled observations when only in possession of a small amount of labeled data. As such it would be of interest to researchers in food science, medical diagnostics, botany, or any area where such a scenario is commonplace.
+
+We have introduced an \proglang{R} package called \pkg{upclass} which goes some way to addressing this problem. As we saw in Section~\ref{sec:Updating}  we can take advantage of the complete-data (both labeled and unlabeled) to create a classifier.  The package is an implementation of the method developed in \cite{dean2006}, and takes advantage of the EM algorithm functionality developed by \cite{fraley2012} in the package~\pkg{mclust}.
+
+We have described the functions available in the package in Section~\ref{sec:Software}. The user can use the function \code{upclassify} to classify his data over the full range of models described in Section~\ref{sec:MBC}, or to select one or more suitable models. It is possible to vary the parameters to control convergence criteria, and also control the output produced. The function \code{noupclassify} is provided to carry out supervised classification, if desired. Functions are provided to interrogate the output from the functions in the package. 
+
+We have shown (in Table~\ref{tab:oilpercent}) that this method can provide better results at low levels of labeling than supervised classification. 
+
+The main limitation of the idea is that we assume that each group can be modeled by a normal distribution as we discussed in Section~\ref{sec:MBC}; in some applications this assumption may not be appropriate. Also, at very low levels of labeling, \pkg{upclass} cannot fit all possible models for the data, and must choose among the models with a suitably reduced number of parameters where model fitting is feasible.
+
+The package is currently based on the ten covariance structures in \pkg{mclust} however fourteen covariance structures are possible within the modified eigen-decomposition. It would be interesting to extend the approach to all fourteen covariance structures \citep{biernacki2006} to increase the flexibility of this approach further. 
+
+A possible avenue for exploration, is to cater for the situation where not all groups are represented in the training set. This becomes more and more likely at very low levels of labeling, and might have other applications if any new datapoint belongs to a previously unknown group.
+
+\section*{Acknowledgements}
+The authors would like to thank the associate editor and two anonymous referees for their helpful remarks and suggestions that contributed to a better presentation of the paper.
+
+This research is supported by the Programme for Research In Third Level
+Institutions (PRTLI) Cycle 5 and co-funded by the European Regional
+Development Fund, and the Science Foundation Ireland Research Frontiers Programme (2007/RFP/MATF281). 
+
+\appendix
+\section{Simulation Code}
+\begin{CodeInput}
+R> library(mclust)
+R> library(classifly)
+R> set.seed(1)
+R> prop <- 0.9  #change this to vary proportions of labelled data.
+R> data(olives)
+R> runlength <- 200
+
+R> nomodel <- vector(mode="character", length=runlength)
+R> model <- vector(mode="character", length=runlength)
+R> ratevec <- vector(mode="numeric", length=runlength)
+R> noratevec <- vector(mode="numeric", length=runlength)
+  
+R>  for(j in c(1:runlength)) 
+R>  {
+R>  X <- as.matrix(olives[,-c(1,2)])
+R>  cl <- unclass(olives[,1])
+R>  N <- dim(X)[1]
+R>  indtrain <- sort(sample(1:N,N * prop))
+R>  Xtrain <- X[indtrain,]
+R>  cltrain <- cl[indtrain]
+R>  indtest <- setdiff(1:N, indtrain)
+R>  Xtest <- X[indtest,]
+R>  cltest <- cl[indtest]
+  
+R>  fitnoup <- noupclassify(Xtrain,cltrain,Xtest,cltest)
+R>  noratevec[j] <- fitnoup[["Best"]]$test$rate
+R>  nomodel[j] <- fitnoup[["Best"]]$modelName
+
+R>  fitup <- upclassify(Xtrain,cltrain,Xtest,cltest)  
+R>  ratevec[j] <- fitup[["Best"]]$test$rate
+R>  model[j] <- fitup[["Best"]]$modelName
+R> }
+R> list1 <- list()
+R> list1$percentage <- pcentvec[i]*100
+R> list1$notable <- table(nomodel)
+R> list1$noratevec <- noratevec
+R> list1$table <- table(model)
+R> list1$ratevec <- ratevec
+
+R> list1$var1 <- var(ratevec)
+R> list1$novar1 <- var(noratevec)
+R> list1
+\end{CodeInput}
+\bibliography{refs}
+\end{document}

@@ -14,36 +14,27 @@ Summarizing Classification Method
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{object}{
-an object of class \code{"upclassfit"}, the result of a call to \code{upclassifymodel} or \code{noupclassifymodel}.
+an object of class \code{"upclassfit"}, the result of a call to \code{upclassify} or \code{noupclassify}.
 }
   \item{\dots}{
 further arguments passed to or from other methods.
 }
 }
 \details{
-\code{summary.upclassfit} gives a fuller output than \code{\link{print.upclassfit}}. Any of the members of the list can be called using the names listed at the bottom of the output.
+\code{summary.upclassfit} gives a fuller output than \code{\link{print.upclassfit}}. Any of the members of the list can be called using the names listed in the helptext for \code{\link{upclassify}} or \code{\link{noupclassify}}.
 }
 \value{
-\item{call}{The function call from \code{upclassifymodel} or \code{noupclassifymodel}}
+\item{Model Name}{A character string identifying the model (same as the input argument).}
+\item{Log Likelihood}{The log-likelihood for the data in the mixture model.}
+\item{Dimension}{The dimension of the data.}
 \item{Ntrain}{The number of observations in the training data.}
 \item{Ntest}{The number of observations in the test data. }
-\item{d}{The dimension of the data.}
-\item{G}{The number of groups in the data.}
-\item{modelName}{A character string identifying the model (same as the input argument).}
-\item{parameters  pro}{A vector whose \emph{k}th component is the mixing proportion for the \emph{k}th component of the mixture model. If the model includes a Poisson term for noise, there should be one more mixing proportion than the number of Gaussian components.}
-\item{mean}{The mean for each component. If there is more than one component, this is a matrix whose \emph{k}th column is the mean of the \emph{k}th component of the mixture model.}
-\item{variance}{A list of variance parameters for the model. The components of this list depend on the model specification.}
-\item{train/test    z}{A matrix whose \code{[i,k]}th entry is the conditional probability of the \emph{i}th observation belonging to the \emph{k}th component of the mixture}
-\item{cl}{A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtrain}/\code{Xtest}.}
-\item{rate}{The number of misclassified observations}
-\item{Brierscore}{The Brier score measuring the accuracy of the probabilities (\code{z}s) obtained.}
-\item{tab}{A table of actual and predicted group classifications}
-\item{ll}{The log-likelihood for the data in the mixture model.}
-\item{bic}{The Bayesian Information Criterion for the data}
-\item{Available Components}{A list of all the components of the output list.}
+\item{bic}{The Bayesian Information Criterion for the best model.}
+\item{misclass}{The number of misclassified observations (displayed only if labels are provided for the test data).}
+\item{rate}{The percentage of misclassified observations(displayed only if labels are provided for the test data).}
 }
 \references{
-C. Fraley and A.E. Raftery (2002). Model based clusetering, discriminant analysis, and density estimation. \emph{Journal of the American Statistical Association} 97:611-631.
+C. Fraley and A.E. Raftery (2002). Model based clustering, discriminant analysis, and density estimation. \emph{Journal of the American Statistical Association} 97:611-631.
 
 Fraley, C. and Raftery, A.E. (2006).
 MCLUST Version  for R: Normal Mixture Modeling and Model-Based Clustering,
@@ -67,7 +58,7 @@ cl <- as.matrix(wine[, 1])
 indtrain <- sort(sample(1:178, 120))
 indtest <- setdiff(1:178, indtrain)
 
-fitup <- upclassifymodel(Xtrain = X[indtrain,], cltrain = cl[indtrain], Xtest = X[indtest, ], cltest = cl[indtest])
+fitup <- upclassify(X[indtrain,], cl[indtrain], X[indtest,], cl[indtest])
 summary(fitup)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the

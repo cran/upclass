@@ -1,10 +1,10 @@
 .packageName <- 'upclass'
 
 upclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", 
-                             tol = 10^-5, iterlim = 1000, Aitken = TRUE, reportrate = TRUE, 
+                             tol = 10^-5, iterlim = 1000, Aitken = TRUE,  
                              ...) 
 {
-  functioncall <- match.call(expand.dots = TRUE) # really not sure what this does
+  functioncall <- match.call(expand.dots = TRUE) 
   
   # get no. of observations in training data
   if (is.matrix(Xtrain)) {
@@ -97,8 +97,7 @@ upclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = 
     res$converged <- (iter < iterlim)
     res$modelName <- modelName
     res$parameters <- fitm$parameters
-    res$reportrate<-reportrate # NR for print to work
-    if (reportrate) {
+    
       fitetrain <- do.call("estep", c(list(data = Xtrain), 
                                       fitm))
       ztrain <- fitetrain$z
@@ -107,12 +106,13 @@ upclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = 
       tab <- matrix(0, G, G)
       rownames(tab) <- colnames(tab) <- 1:G
       tab[rownames(tab0), colnames(tab0)] <- tab0
-      ratetrain <- sum(tab) - sum(diag(tab))
-      Brier <- sum((ltrain - ztrain)^2)/2
+      misclasstrain <- sum(tab) - sum(diag(tab))
+      Brier <- sum((ltrain - ztrain)^2)*100/(2*Ntrain)
       res$train <- list()
       res$train$z <- ztrain
       res$train$cl <- cltrain
-      res$train$rate <- ratetrain
+      res$train$misclass <- misclasstrain
+      res$train$rate <- misclasstrain*100/Ntrain
       res$train$Brierscore <- Brier
       res$train$tab <- tab
       cl <- map(z)
@@ -126,16 +126,16 @@ upclassifymodel <- function (Xtrain, cltrain, Xtest, cltest = NULL, modelName = 
         rownames(tab) <- colnames(tab) <- 1:G
         tab[rownames(tab0), colnames(tab0)] <- tab0
         ratetest <- sum(tab) - sum(diag(tab))
-        Brier <- sum((ltest - z)^2)/2
-        res$test$rate <- ratetest
+        Brier <- sum((ltest - z)^2)*100/(2*Ntest)
+        res$test$misclass <- ratetest
+        res$test$rate <-ratetest*100/length(cltest)
         res$test$Brierscore <- Brier
         res$test$tab <- tab
       }
-    }
+  #  }
     bic.all <- bic(modelName, ll, fitm$n, fitm$d, fitm$G)
     res$ll <- ll
     res$bic <- bic.all
-    class(res)<-"upclassfit"
   }
   else {
     res$error<-"Training groups too small for this model type"

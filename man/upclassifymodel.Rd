@@ -8,7 +8,9 @@ Updated Classification Method using Labeled and Unlabeled Data
 This function implements the EM algorithm by iterating over the E-step and M-step. The initial values are obtained from the labeled data then both steps are further iterated over the complete data, labeled and unlabeled data combined.
 }
 \usage{
-upclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", tol = 10^-5, iterlim = 1000, Aitken = TRUE, reportrate = TRUE, ...)
+upclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL,
+modelName = "EEE", tol = 10^-5, iterlim = 1000, 
+Aitken = TRUE, ...)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -22,11 +24,11 @@ A numeric vector with distinct entries representing a classification of the corr
 A numeric matrix of observations where rows correspond to observations and columns correspond to variables. The group membership of each observation may not be known - unlabeled data.
 }
   \item{cltest}{
-A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtest}. By default, these are not supplied amd the function sets out to obtain them.
+A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtest}. By default, these are not supplied and the function sets out to obtain them.
 }
   \item{modelName}{
 A character string indicating the model, with default "EEE".
-The models available for selction are described in \code{\link{modelvec}}
+The models available for selection are described in \code{\link{modelvec}}
 }
   \item{tol}{
 A positive number, with default \code{10^{-5}}, which is a measure of how strictly convergence is defined.
@@ -37,9 +39,8 @@ A positive integer, with default 1000, which is the desired limit on the maximum
   \item{Aitken}{
 A logical value with default \code{TRUE} which tests for convergence using Aitken acceleration. If value is set to \code{FALSE}, convergence is tested by comparing \code{tol} to the change in log-likelihood between two consecutive iterations. For further information on Aitken acceleration, see \code{\link{Aitken}}
 }
-  \item{reportrate}{
-A logical value with default \code{TRUE} indicating detailed output is desired. This output includes \code{z}, \code{cl}, \code{rate}, \code{Brierscore} and \code{tab} for both the training and test data.
-}
+
+
   \item{\dots}{
 Arguments passed to or from other methods.
 }
@@ -48,7 +49,7 @@ Arguments passed to or from other methods.
 This is an updated approach to typical classification methods. Initially, the M-step is performed on the labeled (training) data to obtain parameter estimates for the model. These are used in an E-step to obtain group memberships for the unlabeled (test) data. The training data labels and new probability estimates for test data labels are combined to form the complete data. From here, the M-step and E-step are iterated over the complete data, with continuous updating until convergence has been reached. This has been shown to result in lower misclassification rates, particularly in cases where only a small proportion of the total data is labeled.
 }
 \value{
-If \code{reportrate = TRUE}, the return value is a list with the following components.
+The return value is a list with the following components:
 
 \item{call}{The function call from \code{upclassifymodel}.}
 \item{Ntrain}{The number of observations in the training data.}
@@ -65,12 +66,12 @@ If \code{reportrate = TRUE}, the return value is a list with the following compo
 \item{cl}{A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtrain}/\code{Xtest}.}
 \item{rate}{The number of misclassified observations.}
 \item{Brierscore}{The Brier score measuring the accuracy of the probabilities (\code{z}s) obtained.}
-\item{tab}{A table of actual abd predicted group classifications.}
+\item{tab}{A table of actual and predicted group classifications.}
 \item{ll}{The log-likelihood for the data in the mixture model.}
 \item{bic}{The Bayesian Information Criterion for the model.}
 }
 \references{
-C. Fraley and A.E. Raftery (2002). Model based clusetering, discriminant analysis, and density estimation. \emph{Journal of the American Statistical Association} 97:611-631.
+C. Fraley and A.E. Raftery (2002). Model based clustering, discriminant analysis, and density estimation. \emph{Journal of the American Statistical Association} 97:611-631.
 
 Fraley, C. and Raftery, A.E. (2006).
 MCLUST Version  for R: Normal Mixture Modeling and Model-Based Clustering,
@@ -87,13 +88,15 @@ Niamh Russell
 \code{\link{upclassify}}, \code{\link{Aitken}}, \code{\link{modelvec}}
 }
 \examples{
+# This function is not designed to be used on its own, 
+# but to be called by \code{upclassify}
 data(wine, package = "gclus")
 X <- as.matrix(wine[, -1])
-cl <- as.matrix(wine[, 1])
+cl <- unclass(wine[, 1])
 indtrain <- sort(sample(1:178, 120))
 indtest <- setdiff(1:178, indtrain)
 
-fitup <- upclassifymodel(Xtrain = X[indtrain,], cltrain = cl[indtrain], Xtest = X[indtest, ], cltest = cl[indtest])
+fitup <- upclassifymodel(X[indtrain,], cl[indtrain], X[indtest,], cl[indtest])
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory.

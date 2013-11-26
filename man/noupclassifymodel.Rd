@@ -3,10 +3,10 @@
 
 \title{Classification Method using labeled data only}
 \description{
-\code{noupclassifymodel} implements the EM algorithm to classify unlabeled data using parameter estimates derived from labeled data only, 
+\code{noupclassifymodel} implements the EM algorithm to classify unlabeled data using parameter estimates derived from labeled data only. It is a background function not designed to be used directly.
 }
 \usage{
-noupclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", reportrate = TRUE, ...)
+noupclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", ...)
 }
 
 \arguments{
@@ -20,13 +20,11 @@ noupclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", repo
   A numeric vector with distinct entries representing a classification of the corresponding observations in \code{Xtest}. By default, these are not supplied and the function sets out to determine these.}
   \item{modelName}{
   A character string indicating the model, with default \code{"EEE"}. The models available for univariate and multivariate data are described in \code{\link{modelvec}}.}
-  \item{reportrate}{
-  A logical value with default \code{TRUE} indicating detailed output is desired. This output includes \code{z}, \code{cl}, \code{rate}, \code{Brierscore} and \code{tab} for both the training and test data.}
   \item{\dots}{
   Arguments passed to or from other methods.}
 }
 
-\value{If \code{reportrate = TRUE}, the return value is a list with the following components:
+\value{The return value is a list with the following components:
 \item{call}{The function call from \code{noupclassifymodel} or \code{upclassifymodel}}
 \item{Ntrain}{The number of observations in the training data.}
 \item{Ntest}{The number of observations in the test data.}
@@ -55,7 +53,7 @@ noupclassifymodel(Xtrain, cltrain, Xtest, cltest = NULL, modelName = "EEE", repo
 
 \references{
 Bensmail, H. and Celeux, G. (1996).
-Regularized Gaussian discriminant analysis through eigenvalue decomposition/
+Regularized Gaussian discriminant analysis through eigenvalue decomposition.
 \emph{Journal of the American Statistical Association} 91:1743-1748.
 
 Fraley, C. and Raftery, A.E. (2002).
@@ -73,13 +71,16 @@ University of Washington.
 }
 
 \examples{
+# This function is not designed to be used on its own, 
+# but to be called by \code{noupclassify}
 data(wine, package = "gclus")
 X <- as.matrix(wine[, -1])
-cl <- as.matrix(wine[, 1])
+cl <- unclass(wine[, 1])
 indtrain <- sort(sample(1:178, 120))
 indtest <- setdiff(1:178, indtrain)
 
-fitnoup <- noupclassifymodel(Xtrain = X[indtrain,], cltrain = cl[indtrain], Xtest = X[indtest, ], cltest = cl[indtest])
+fitnoup <- noupclassifymodel(X[indtrain,], 
+cl[indtrain], X[indtest,], cl[indtest])
 }
 
 \keyword{Classification}

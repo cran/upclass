@@ -6,7 +6,7 @@
 Printing Classification Method
 }
 \description{
-\code{summary} method for class \code{"upclassfit"}. 
+\code{print} method for class \code{"upclassfit"}. 
 }
 \usage{
 \method{print}{upclassfit}(x, \dots)
@@ -14,28 +14,21 @@ Printing Classification Method
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{
-an object of class \code{"upclassfit"}, the result of a call to \code{upclassifymodel} or \code{noupclassifymodel}.
+an object of class \code{"upclassfit"}, the result of a call to \code{upclassify} or \code{noupclassify}.
 }
   \item{\dots}{
 further arguments passed to or from other methods.
 }
 }
 \details{
-\code{print.upclassfit} gives a more concise output than \code{\link{summary.upclassfit}}. Any of the members of the list can be called using the names listed at the bottom of the output.
+\code{print.upclassfit} gives a more concise output than \code{\link{summary.upclassfit}}. Any of the members of the list can be called using the names listed in the helptext for \code{\link{upclassify}} or \code{\link{noupclassify}}.
 }
 \value{
-\item{call}{The function call from \code{upclassifymodel} or \code{noupclassifymodel}}
-\item{Ntrain}{The number of observations in the training data.}
-\item{Ntest}{The number of observations in the test data. }
-\item{d}{The dimension of the data.}
-\item{G}{The number of groups in the data.}
-\item{modelName}{A character string identifying the model (same as the input argument).}
 
-\item{rate}{The number of misclassified observations}
-\item{Brierscore}{The Brier score measuring the accuracy of the probabilities}
-\item{bic}{The Bayesian Information Criterion for the data}
-\item{tab}{A table of actual and predicted group classifications}
-\item{Available Components}{A list of all the components of the output list.}.
+\item{modelName}{A character string identifying the model (same as the input argument).}
+\item{misclass}{The number of misclassified observations}
+\item{rate}{The percentage of misclassified observations}
+
 }
 \references{
 C. Fraley and A.E. Raftery (2002). Model based clusetering, discriminant analysis, and density estimation. \emph{Journal of the American Statistical Association} 97:611-631.
@@ -61,7 +54,7 @@ cl <- as.matrix(wine[, 1])
 indtrain <- sort(sample(1:178, 120))
 indtest <- setdiff(1:178, indtrain)
 
-fitup <- upclassifymodel(Xtrain = X[indtrain,], cltrain = cl[indtrain], Xtest = X[indtest, ], cltest = cl[indtest])
+fitup <- upclassify(X[indtrain,], cl[indtrain], X[indtest,], cl[indtest])
 print(fitup)
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
